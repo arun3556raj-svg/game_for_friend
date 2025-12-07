@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Number Guessing Game — for Friend</title>
+  <style>
+    :root{
+      --bg:#0f1720; --card:#0b1220; --accent:#60a5fa; --muted:#94a3b8; --success:#34d399; --danger:#fb7185;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; padding:32px; background:linear-gradient(180deg,#071127 0%, #071b2b 100%); color:#e6eef9;
+      display:flex; align-items:center; justify-content:center; min-height:100vh;
+    }
+    .card{
+      width:min(760px,96vw); background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border:1px solid rgba(255,255,255,0.03); border-radius:12px; padding:24px; box-shadow:0 8px 30px rgba(2,6,23,0.6);
+    }
+    h1{margin:0 0 8px; font-size:20px; color:var(--accent)}
+    p.lead{margin:0 0 18px; color:var(--muted)}
+    .row{display:flex; gap:12px; flex-wrap:wrap}
+    label{display:block; font-size:13px; color:var(--muted); margin-bottom:6px}
+    input[type="text"], select, input[type="number"]{
+      padding:10px 12px; background:transparent; color:inherit; border:1px solid rgba(255,255,255,0.04); border-radius:8px;
+      min-width:160px;
+    }
+    button{
+      background:linear-gradient(90deg,var(--accent), #3b82f6); color:#04212e; border:none; padding:10px 14px; border-radius:8px;
+      cursor:pointer; font-weight:600;
+    }
+    button.ghost{background:transparent; color:var(--accent); border:1px solid rgba(255,255,255,0.03)}
+    .status{margin-top:18px; padding:12px; border-radius:8px; background:rgba(255,255,255,0.01); color:var(--muted)}
+    .message{font-weight:700; margin-top:10px}
+    .hint{margin-top:8px; color:var(--muted)}
+    .footer{margin-top:18px; display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:wrap}
+    .small{font-size:13px; color:var(--muted)}
+    .win{color:var(--success)}
+    .lose{color:var(--danger)}
+    .attempts{font-weight:700}
+    .center{display:flex; align-items:center; gap:8px}
+  </style>
+</head>
+<body>
+  <main class="card" role="main">
+    <h1>Number Guessing Game</h1>
+    <p class="lead">A friendly guessing game inspired by Mr. ArunRaj's Python script. Enter your name, say "hi" to start, pick a difficulty and try to guess the number.</p>
+
+    <div id="setup" class="setup">
+      <div class="row" style="align-items:end">
+        <div>
+          <label for="name">Your name</label>
+          <input id="name" type="text" placeholder="Enter your good name" />
+        </div>
+
+        <div>
+          <label for="greet">Greeting (type "hi" to start)</label>
+          <input id="greet" type="text" placeholder="hi" />
+        </div>
+
+        <div>
+          <label for="difficulty">Difficulty</label>
+          <select id="difficulty">
+            <option value="easy">Easy (1–20, 10 attempts)</option>
+            <option value="medium">Medium (1–50, 7 attempts)</option>
+            <option value="hard">Hard (1–100, 5 attempts)</option>
+          </select>
+        </div>
+
+        <div style="align-self:stretch; display:flex; align-items:flex-end">
+          <button id="startBtn">Start Game</button>
+        </div>
+      </div>
+    </div>
+
+    <section id="gameArea" style="display:none; margin-top:16px;">
+      <div class="status" id="statusBar">
+        <div class="center">
+          <div class="small">Player: <span id="playerName" style="font-weight:700"></span></div>
+          <div class="small" style="margin-left:8px">Difficulty: <span id="currentDifficulty" style="font-weight:700"></span></div>
+          <div style="margin-left:auto" class="small">Attempts left: <span id="attemptsLeft" class="attempts"></span></div>
+        </div>
+
+        <div class="message" id="message">I'm thinking of a number. Make your guess!</div>
+        <div class="hint" id="hint"></div>
+      </div>
+
+      <div class="row" style="margin-top:12px; align-items:center">
+        <div>
+          <label for="guess">Your guess</label>
+          <input id="guess" type="number" placeholder="Enter a number" />
+        </div>
+
+        <div style="align-self:flex-end">
+          <button id="guessBtn">Submit Guess</button>
+        </div>
+
+        <div style="align-self:flex-end">
+          <button id="giveUp" class="ghost">Give up</button>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="small">Tip: Non-numeric input is ignored and you'll be asked again.</div>
+        <div>
+          <button id="playAgain" class="ghost" style="display:none">Play again</button>
+          <button id="shareBtn" class="ghost">Copy shareable URL</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Game configuration
+    const difficulties = {
+      easy:   {min:1, max:20, attempts:10},
+      medium: {min:1, max:50, attempts:7},
+      hard:   {min:1, max:100, attempts:5}
+    };
+
+    // Elements
+    const nameInput = document.getElementById('name');
+    const greetInput = document.getElementById('greet');
+    const difficultySelect = document.getElementById('difficulty');
+    const startBtn = document.getElementById('startBtn');
+
+    const gameArea = document.getElementById('gameArea');
+    const playerNameEl = document.getElementById('playerName');
+    const currentDifficultyEl = document.getElementById('currentDifficulty');
+    const attemptsLeftEl = document.getElementById('attemptsLeft');
+    const messageEl = document.getElementById('message');
+    const hintEl = document.getElementById('hint');
+
+    const guessInput = document.getElementById('guess');
+    const guessBtn = document.getElementById('guessBtn');
+    const giveUpBtn = document.getElementById('giveUp');
+    const playAgainBtn = document.getElementById('playAgain');
+    const shareBtn = document.getElementById('shareBtn');
+
+    let state = {
+      playerName: 'Friend',
+      difficulty: 'easy',
+      secret: null,
+      attemptsLeft: 0,
+      attemptsUsed: 0,
+      min: 1,
+      max: 20,
+      running: false
+    };
+
+    function titleCase(s){
+      return s ? s.trim().split(' ').map(p => p.charAt(0).toUpperCase()+p.slice(1).toLowerCase()).join(' ') : 'Friend';
+    }
+
+    function startGame(){
+      const greet = (greetInput.value || '').trim().toLowerCase();
+      if(greet !== 'hi'){
+        alert('You did not type "hi". Please greet with hi to start.');
+        return;
+      }
+
+      state.playerName = titleCase(nameInput.value) || 'Friend';
+      state.difficulty = difficultySelect.value;
+      const cfg = difficulties[state.difficulty];
+      state.min = cfg.min; state.max = cfg.max; state.attemptsLeft = cfg.attempts;
+      state.attemptsUsed = 0;
+      state.secret = Math.floor(Math.random()*(state.max - state.min + 1)) + state.min;
+      state.running = true;
+
+      // update UI
+      playerNameEl.textContent = state.playerName;
+      currentDifficultyEl.textContent = state.difficulty;
+      attemptsLeftEl.textContent = state.attemptsLeft;
+      messageEl.textContent = `Hello, ${state.playerName}. I'm thinking of a number between ${state.min} and ${state.max}. Good luck!`;
+      hintEl.textContent = '';
+      guessInput.value = '';
+      gameArea.style.display = '';
+      playAgainBtn.style.display = 'none';
+      guessInput.focus();
+    }
+
+    function endRound(won){
+      state.running = false;
+      if(won){
+        messageEl.innerHTML = `<span class="win">Nice! ${state.playerName}, you guessed it in ${state.attemptsUsed} attempt(s).</span>`;
+      } else {
+        messageEl.innerHTML = `<span class="lose">Too bad, ${state.playerName}. The number was ${state.secret}.</span>`;
+      }
+      attemptsLeftEl.textContent = 0;
+      playAgainBtn.style.display = '';
+    }
+
+    function submitGuess(){
+      if(!state.running) return;
+      const raw = guessInput.value;
+      if(raw === '' || raw === null){ alert('Please enter a number.'); return; }
+      const guess = Number(raw);
+      if(Number.isNaN(guess) || !Number.isInteger(guess)){
+        alert('Numbers only. Do not try to fool me.');
+        guessInput.value = '';
+        return;
+      }
+      if(guess < state.min || guess > state.max){
+        alert(`Please guess a number between ${state.min} and ${state.max}.`);
+        return;
+      }
+
+      state.attemptsUsed += 1;
+      state.attemptsLeft -= 1;
+      attemptsLeftEl.textContent = state.attemptsLeft;
+
+      if(guess === state.secret){
+        endRound(true);
+      } else {
+        if(guess < state.secret){
+          messageEl.textContent = `Too low, ${state.playerName}. Try again.`;
+        } else {
+          messageEl.textContent = `Too high, ${state.playerName}. Try again.`;
+        }
+        hintEl.textContent = `You've used ${state.attemptsUsed} attempt(s).`;
+        if(state.attemptsLeft <= 0){
+          endRound(false);
+        }
+      }
+      guessInput.value = '';
+      guessInput.focus();
+    }
+
+    // UI events
+    startBtn.addEventListener('click', startGame);
+    guessBtn.addEventListener('click', submitGuess);
+    guessInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') submitGuess(); });
+    giveUpBtn.addEventListener('click', () => {
+      if(!state.running) return;
+      if(confirm('Give up and reveal the number?')){
+        endRound(false);
+      }
+    });
+
+    playAgainBtn.addEventListener('click', () => {
+      // Reset to setup; keep name and greet
+      gameArea.style.display = 'none';
+      document.getElementById('setup').scrollIntoView({behavior:'smooth'});
+    });
+
+    // Copy shareable URL (current page URL)
+    shareBtn.addEventListener('click', async () => {
+      try{
+        const url = location.href;
+        await navigator.clipboard.writeText(url);
+        shareBtn.textContent = 'URL copied!';
+        setTimeout(()=> shareBtn.textContent = 'Copy shareable URL', 2000);
+      }catch(e){
+        alert('Copy failed. You can share the page URL manually: ' + location.href);
+      }
+    });
+
+    // Pre-fill friendly defaults (nice touch)
+    nameInput.value = '';
+    greetInput.value = 'hi';
+  </script>
+</body>
+</html>
